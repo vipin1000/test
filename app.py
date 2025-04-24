@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string,render_template
 from ipwhois import IPWhois
 from datetime import datetime
 import sqlite3
@@ -44,6 +44,8 @@ def log_visitor(ip, isp, country):
     conn.close()
 
 # Home Route
+
+
 @app.route('/')
 def home():
     ip = get_client_ip()
@@ -60,13 +62,8 @@ def home():
 
     log_visitor(ip, isp, country)
 
-    return render_template_string('''
-        <h2>Welcome to the Dashboard</h2>
-        <p><strong>Your IP:</strong> {{ ip }}</p>
-        <p><strong>ISP / Org:</strong> {{ isp }}</p>
-        <p><strong>Country:</strong> {{ country }}</p>
-        <a href="/visits">View all visitors</a>
-    ''', ip=ip, isp=isp, country=country)
+    return render_template('home.html', ip=ip, isp=isp, country=country)
+
 
 # Route to view all visitor logs
 @app.route('/visits')
