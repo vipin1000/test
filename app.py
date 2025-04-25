@@ -99,7 +99,7 @@ import os
 
 app = Flask(__name__)
 DB_PATH = 'visitor_log.db'
-GEOIP_DB = 'data/GeoLite2-City.mmdb'
+GEOIP_DB = 'data/GeoLite2-ASN.mmdb'
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
