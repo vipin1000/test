@@ -96,10 +96,14 @@ from datetime import datetime
 import geoip2.database
 import sqlite3
 import os
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
-DB_PATH = 'visitor_log.db'
-GEOIP_DB = 'data/GeoLite2-ASN.mmdb'
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'visitor_log.db')
+GEOIP_DB = os.path.join(BASE_DIR, 'data', 'GeoLite2-City.mmdb')
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -126,19 +130,22 @@ def get_client_ip():
     else:
         ip = request.remote_addr
     return ip
-
 def get_location(ip):
+    if not os.path.exists(GEOIP_DB):
+        print(f"GeoIP database not found at {GEOIP_DB}")
+        return "Unknown", "Unknown", "Unknown"
+    
     try:
         reader = geoip2.database.Reader(GEOIP_DB)
         response = reader.city(ip)
         city = response.city.name or "Unknown"
-        state = response.subdivisions.most_specific.name or "Unknown"
+        state = response.subdivisions.most_specific.name if response.subdivisions else "Unknown"
         country = response.country.name or "Unknown"
         reader.close()
+        return city, state, country
     except Exception as e:
         print(f"GeoIP error: {e}")
-        city = state = country = "Unknown"
-    return city, state, country
+        return "Unknown", "Unknown", "Unknown"
 
 def get_isp(ip):
     try:
@@ -161,21 +168,24 @@ def log_visitor(ip, isp, city, state, country):
 
 @app.route('/')
 def home():
-    ip = get_client_ip()
-    isp = get_isp(ip)
-    city, state, country = get_location(ip)
-    log_visitor(ip, isp, city, state, country)
+    try:
+        ip = get_client_ip()
+        isp = get_isp(ip)
+        city, state, country = get_location(ip)
+        log_visitor(ip, isp, city, state, country)
 
-    return render_template_string('''
-        <h2>Welcome to the Dashboard</h2>
-        <p><strong>Your IP:</strong> {{ ip }}</p>
-        <p><strong>ISP / Org:</strong> {{ isp }}</p>
-        <p><strong>City:</strong> {{ city }}</p>
-        <p><strong>State:</strong> {{ state }}</p>
-        <p><strong>Country:</strong> {{ country }}</p>
-        <a href="/visits">View all visitors</a>
-    ''', ip=ip, isp=isp, city=city, state=state, country=country)
-
+        return render_template_string('''
+            <h2>Welcome to the Dashboard</h2>
+            <p><strong>Your IP:</strong> {{ ip }}</p>
+            <p><strong>ISP / Org:</strong> {{ isp }}</p>
+            <p><strong>City:</strong> {{ city }}</p>
+            <p><strong>State:</strong> {{ state }}</p>
+            <p><strong>Country:</strong> {{ country }}</p>
+            <a href="/visits">View all visitors</a>
+        ''', ip=ip, isp=isp, city=city, state=state, country=country)
+    except Exception as e:
+        logging.error(f"Error in home route: {str(e)}")
+        return f"An error occurred: {str(e)}", 500
 @app.route('/visits')
 def visits():
     conn = sqlite3.connect(DB_PATH)
